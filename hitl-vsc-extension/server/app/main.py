@@ -1,6 +1,10 @@
 import uuid
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from .schemas import (
     AgentRequestEnvelope,
@@ -28,4 +32,4 @@ async def auth_register(body: AuthRegisterRequest) -> AuthRegisterResponse:
 @app.post("/interact", response_model=InstructionalResponseEnvelope)
 async def interact(envelope: AgentRequestEnvelope) -> InstructionalResponseEnvelope:
     """Accept an AgentRequestEnvelope and return an InstructionalResponseEnvelope."""
-    return apply_intervention(envelope)
+    return await apply_intervention(envelope)
