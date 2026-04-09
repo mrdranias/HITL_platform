@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./apiClient";
 import { HitlChatProvider } from "./chatProvider";
+import { ChatViewProvider } from "./chatViewProvider";
 import { SessionState } from "./sessionState";
 
 const SECRET_KEY = "hitl.studentToken";
@@ -52,6 +53,17 @@ export async function activate(
     return;
   }
 
+  // --- Webview Chat Panel (Section 3.9) ---
+  const chatViewProvider = new ChatViewProvider(
+    context.extensionUri,
+    apiClient,
+    () => sessionState,
+    version,
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatViewProvider),
+  );
+
   // --- Command: hitl.setPlanningDocument (Section 3.6) ---
   context.subscriptions.push(
     vscode.commands.registerCommand("hitl.setPlanningDocument", () => {
@@ -67,29 +79,58 @@ export async function activate(
         vscode.window.showInformationMessage(
           `HITL: Planning document set to ${vscode.workspace.asRelativePath(editor.document.uri)}`,
         );
+        chatViewProvider.updateSessionStatus();
       }
     }),
   );
 
   // --- Chat Model Provider (Section 3.1) ---
+  const modelInfo: vscode.LanguageModelChatInformation = {
+    id: "hitl-routing",
+    name: "HITL Routing",
+    family: "hitl",
+    version,
+    maxInputTokens: 4096,
+    maxOutputTokens: 4096,
+    capabilities: {},
+  };
+
   const provider = new HitlChatProvider(
     apiClient,
     () => sessionState,
-    version,
+    modelInfo,
   );
 
   context.subscriptions.push(
-    (vscode.lm as any).registerChatModelProvider(
-      "hitl-routing",
-      provider,
-      {
-        name: "HITL Routing",
-        vendor: "hitl-lab",
-        family: "hitl",
-        version,
-        isDefault: false,
-      },
-    ),
+    vscode.lm.registerLanguageModelChatProvider("hitl-lab", provider),
+  );
+
+  // --- Test command: send a quick message through the model ---
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hitl.testChat", async () => {
+      try {
+        const models = await vscode.lm.selectChatModels({ vendor: "hitl-lab" });
+        if (models.length === 0) {
+          vscode.window.showErrorMessage("HITL: No HITL model found.");
+          return;
+        }
+        const model = models[0];
+        vscode.window.showInformationMessage(`HITL: Found model "${model.name}". Sending test message...`);
+        const messages = [
+          vscode.LanguageModelChatMessage.User("Hello, this is a test."),
+        ];
+        const response = await model.sendRequest(messages);
+        let text = "";
+        for await (const part of response.text) {
+          text += part;
+        }
+        vscode.window.showInformationMessage(`HITL response: ${text.slice(0, 200)}`);
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          `HITL test failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }),
   );
 }
 

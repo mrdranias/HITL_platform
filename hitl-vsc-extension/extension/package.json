@@ -19,8 +19,36 @@
       {
         "command": "hitl.setPlanningDocument",
         "title": "HITL: Set Planning Document"
+      },
+      {
+        "command": "hitl.testChat",
+        "title": "HITL: Test Chat"
       }
-    ]
+    ],
+    "languageModelChatProviders": [
+      {
+        "vendor": "hitl-lab",
+        "displayName": "HITL Routing"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "hitl-chat",
+          "title": "HITL AI Lab",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "hitl-chat": [
+        {
+          "type": "webview",
+          "id": "hitl.chatView",
+          "name": "Chat"
+        }
+      ]
+    }
   },
   "scripts": {
     "compile": "tsc -p .",

@@ -69,7 +69,18 @@ hitl-vsc-extension/
 
 ### 3.1 Provider Registration
 
-The extension must register as a `vscode.lm.LanguageModelChatProvider` to natively receive interaction payloads from the VS Code language model API. Because this API requires users to explicitly select the registered model, all study participants (all arms) must use this provider. This ensures logging comparability across arms — no arm uses native, unmediated LLM access.
+The extension registers as a `vscode.lm.LanguageModelChatProvider` using the `chatProvider` proposed API. This makes the HITL model available programmatically via `vscode.lm.selectChatModels()`. However, third-party language model providers do **not** appear in GitHub Copilot Chat's model selector — Copilot only surfaces its own models. Therefore, the extension provides its own **webview-based chat panel** (see [Section 3.9](#39-webview-chat-panel)) as the student-facing interface. All study participants (all arms) must use this panel. This ensures logging comparability across arms — no arm uses native, unmediated LLM access.
+
+### 3.9 Webview Chat Panel
+
+Because the `LanguageModelChatProvider` API does not surface registered models in existing VS Code chat UIs (e.g., Copilot Chat), the extension must provide its own chat interface as a **sidebar webview panel**. This panel:
+
+- Renders as a VS Code sidebar view (activity bar icon).
+- Provides a conversation-style UI with a message input and scrolling message history.
+- Routes all messages through the registered `LanguageModelChatProvider` via `vscode.lm.selectChatModels()`, preserving the full mediation pipeline (envelope construction, server interaction, drift injection).
+- Streams response chunks progressively for a smooth UX (see [Section 6.3](#63-streaming-and-latency)).
+- Displays session status (arm assignment, current landmark, planning document state).
+- Is the **only** supported interface for student-LLM interaction during the study. Students must not use Copilot Chat or other LLM tools directly.
 
 ### 3.2 Authentication and Arm Assignment
 

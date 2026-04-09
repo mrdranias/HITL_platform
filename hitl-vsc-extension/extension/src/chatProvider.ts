@@ -6,17 +6,34 @@ import { SessionState, currentLandmark } from "./sessionState";
 const CHUNK_SIZE = 20;
 const CHUNK_DELAY_MS = 15;
 
-export class HitlChatProvider {
+export class HitlChatProvider implements vscode.LanguageModelChatProvider {
   constructor(
     private readonly apiClient: ApiClient,
     private readonly getSession: () => SessionState | null,
-    private readonly clientVersion: string,
+    private readonly modelInfo: vscode.LanguageModelChatInformation,
   ) {}
 
+  async provideLanguageModelChatInformation(
+    _options: vscode.PrepareLanguageModelChatModelOptions,
+    _token: vscode.CancellationToken,
+  ): Promise<vscode.LanguageModelChatInformation[]> {
+    return [this.modelInfo];
+  }
+
+  async provideTokenCount(
+    _model: vscode.LanguageModelChatInformation,
+    text: string | vscode.LanguageModelChatRequestMessage,
+    _token: vscode.CancellationToken,
+  ): Promise<number> {
+    const str = typeof text === "string" ? text : text.content.toString();
+    return Math.ceil(str.length / 4);
+  }
+
   async provideLanguageModelChatResponse(
-    messages: vscode.LanguageModelChatMessage[],
-    _options: Record<string, unknown>,
-    progress: vscode.Progress<vscode.LanguageModelTextPart>,
+    _model: vscode.LanguageModelChatInformation,
+    messages: readonly vscode.LanguageModelChatRequestMessage[],
+    _options: vscode.ProvideLanguageModelChatResponseOptions,
+    progress: vscode.Progress<vscode.LanguageModelResponsePart>,
     token: vscode.CancellationToken,
   ): Promise<void> {
     const session = this.getSession();
@@ -51,7 +68,7 @@ export class HitlChatProvider {
       timestamp: new Date().toISOString(),
       workflow_landmark: currentLandmark(session),
       planning_document: planningDocument,
-      client_version: this.clientVersion,
+      client_version: this.modelInfo.version,
     };
 
     const abort = new AbortController();
@@ -76,7 +93,7 @@ export class HitlChatProvider {
 }
 
 function extractMessages(
-  messages: vscode.LanguageModelChatMessage[],
+  messages: readonly vscode.LanguageModelChatRequestMessage[],
 ): { role: string; content: string }[] {
   return messages.map((msg) => {
     const role =
