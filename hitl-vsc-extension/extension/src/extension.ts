@@ -19,6 +19,24 @@ export async function activate(
   const apiClient = new ApiClient(SERVER_URL);
   const sessionLog = new SessionLog(context.globalStorageUri);
 
+  // --- IRB Disclosure (Section 9) ---
+  const IRB_KEY = "hitl.irbDisclosureAccepted";
+  if (!context.globalState.get<boolean>(IRB_KEY)) {
+    const consent = await vscode.window.showWarningMessage(
+      "HITL AI Lab: This extension logs your AI interactions (prompts and responses) " +
+        "to a research server for study purposes. No personally identifying information " +
+        "is collected — only an opaque student token. By proceeding, you acknowledge " +
+        "this data collection as described in the study consent form.",
+      { modal: true },
+      "I Understand",
+    );
+    if (consent !== "I Understand") {
+      vscode.window.showErrorMessage("HITL: Disclosure must be accepted to use this extension.");
+      return;
+    }
+    await context.globalState.update(IRB_KEY, true);
+  }
+
   // --- Authentication (Section 6.1) ---
   let token = await secrets.get(SECRET_KEY);
   if (!token) {

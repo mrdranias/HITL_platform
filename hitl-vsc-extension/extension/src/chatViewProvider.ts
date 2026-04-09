@@ -4,6 +4,9 @@ import { AgentRequestEnvelope } from "./schemas";
 import { SessionLog } from "./sessionLog";
 import { SessionState, currentLandmark } from "./sessionState";
 
+const CHUNK_SIZE = 20;
+const CHUNK_DELAY_MS = 15;
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -135,7 +138,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const assistantContent = response.response_content;
       this.conversationHistory.push({ role: "assistant", content: assistantContent });
 
-      this.postMessage({ type: "addMessage", role: "assistant", content: assistantContent });
+      // Stream response progressively (Section 3.8 / 6.3)
+      this.postMessage({ type: "streamStart" });
+      for (let i = 0; i < assistantContent.length; i += CHUNK_SIZE) {
+        this.postMessage({
+          type: "streamChunk",
+          text: assistantContent.slice(i, i + CHUNK_SIZE),
+        });
+        await new Promise((resolve) => setTimeout(resolve, CHUNK_DELAY_MS));
+      }
+      this.postMessage({ type: "streamEnd" });
       this.postMessage({ type: "setLoading", loading: false });
 
       // Update landmark display after interaction
@@ -342,6 +354,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   const sendBtn = document.getElementById('sendBtn');
 
   let messageCount = 0;
+  let streamingDiv = null;
 
   function addMessage(role, content) {
     if (emptyState) emptyState.remove();
@@ -380,6 +393,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     switch (msg.type) {
       case 'addMessage':
         addMessage(msg.role, msg.content);
+        break;
+      case 'streamStart':
+        if (emptyState) emptyState.remove();
+        streamingDiv = document.createElement('div');
+        streamingDiv.className = 'message assistant';
+        messagesEl.appendChild(streamingDiv);
+        break;
+      case 'streamChunk':
+        if (streamingDiv) {
+          streamingDiv.textContent += msg.text;
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        break;
+      case 'streamEnd':
+        streamingDiv = null;
+        messageCount++;
         break;
       case 'error':
         if (emptyState) emptyState.remove();
