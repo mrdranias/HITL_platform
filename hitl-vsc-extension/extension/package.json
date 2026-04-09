@@ -1,0 +1,41 @@
+{
+  "name": "hitl-routing-extension",
+  "displayName": "HITL AI Lab Routing",
+  "description": "Client-side mediation adapter for HITL AI-assisted coding study",
+  "version": "0.1.0",
+  "publisher": "hitl-lab",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "enabledApiProposals": [
+    "chatProvider"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "hitl.setPlanningDocument",
+        "title": "HITL: Set Planning Document"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p ."
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "@types/vscode": "^1.115.0",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}

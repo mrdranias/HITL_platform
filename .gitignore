@@ -1,0 +1,13 @@
+# Extension
+hitl-vsc-extension/extension/node_modules/
+hitl-vsc-extension/extension/out/
+
+# Server
+hitl-vsc-extension/server/.venv/
+hitl-vsc-extension/server/app/__pycache__/
+
+# General
+*.js.map
+__pycache__/
+*.pyc
+.env

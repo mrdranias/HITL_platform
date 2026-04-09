@@ -54,7 +54,14 @@ export class HitlChatProvider {
       client_version: this.clientVersion,
     };
 
-    const response = await this.apiClient.interact(envelope);
+    const abort = new AbortController();
+    const onCancel = token.onCancellationRequested(() => abort.abort());
+    let response;
+    try {
+      response = await this.apiClient.interact(envelope, abort.signal);
+    } finally {
+      onCancel.dispose();
+    }
     session.interactionCount++;
 
     const text = response.response_content;
@@ -75,7 +82,9 @@ function extractMessages(
     const role =
       msg.role === vscode.LanguageModelChatMessageRole.User
         ? "user"
-        : "assistant";
+        : msg.role === vscode.LanguageModelChatMessageRole.Assistant
+          ? "assistant"
+          : "system";
     let content = "";
     for (const part of msg.content) {
       if (part instanceof vscode.LanguageModelTextPart) {
