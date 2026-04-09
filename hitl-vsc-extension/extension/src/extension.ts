@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { ApiClient } from "./apiClient";
 import { HitlChatProvider } from "./chatProvider";
 import { ChatViewProvider } from "./chatViewProvider";
+import { SessionLog } from "./sessionLog";
 import { SessionState } from "./sessionState";
 
 const SECRET_KEY = "hitl.studentToken";
@@ -16,6 +17,7 @@ export async function activate(
   const version: string =
     (context.extension.packageJSON as { version?: string }).version ?? "0.0.0";
   const apiClient = new ApiClient(SERVER_URL);
+  const sessionLog = new SessionLog(context.globalStorageUri);
 
   // --- Authentication (Section 6.1) ---
   let token = await secrets.get(SECRET_KEY);
@@ -46,6 +48,12 @@ export async function activate(
       interactionCount: 0,
       planningDocumentUri: null,
     };
+
+    await sessionLog.logSessionStart(
+      sessionState.sessionId,
+      sessionState.projectId,
+      sessionState.armId,
+    );
   } catch (err) {
     vscode.window.showErrorMessage(
       `HITL: Authentication failed — ${err instanceof Error ? err.message : String(err)}`,
@@ -53,12 +61,29 @@ export async function activate(
     return;
   }
 
+  // --- Command: hitl.resetToken ---
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hitl.resetToken", async () => {
+      await secrets.delete(SECRET_KEY);
+      sessionState = null;
+      vscode.window.showInformationMessage(
+        "HITL: Token cleared. Reload the window to re-authenticate.",
+        "Reload",
+      ).then((action) => {
+        if (action === "Reload") {
+          vscode.commands.executeCommand("workbench.action.reloadWindow");
+        }
+      });
+    }),
+  );
+
   // --- Webview Chat Panel (Section 3.9) ---
   const chatViewProvider = new ChatViewProvider(
     context.extensionUri,
     apiClient,
     () => sessionState,
     version,
+    sessionLog,
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatViewProvider),

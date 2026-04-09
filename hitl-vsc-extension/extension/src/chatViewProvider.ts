@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./apiClient";
 import { AgentRequestEnvelope } from "./schemas";
+import { SessionLog } from "./sessionLog";
 import { SessionState, currentLandmark } from "./sessionState";
 
 interface ChatMessage {
@@ -19,6 +20,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private readonly apiClient: ApiClient,
     private readonly getSession: () => SessionState | null,
     private readonly clientVersion: string,
+    private readonly sessionLog: SessionLog,
   ) {}
 
   resolveWebviewView(
@@ -83,6 +85,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         type: "error",
         text: 'A planning document must be set before using the AI assistant. Run "HITL: Set Planning Document" first.',
       });
+      const action = await vscode.window.showWarningMessage(
+        "HITL: A planning document is required before sending messages (Arms 2/3).",
+        "Set Planning Document",
+      );
+      if (action === "Set Planning Document") {
+        await vscode.commands.executeCommand("hitl.setPlanningDocument");
+      }
       return;
     }
 
@@ -116,6 +125,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const response = await this.apiClient.interact(envelope);
       session.interactionCount++;
 
+      await this.sessionLog.logInteractionOk(
+        session.sessionId,
+        session.projectId,
+        session.armId,
+        session.interactionCount,
+      );
+
       const assistantContent = response.response_content;
       this.conversationHistory.push({ role: "assistant", content: assistantContent });
 
@@ -125,10 +141,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Update landmark display after interaction
       this.updateSessionStatus();
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      await this.sessionLog.logInteractionError(
+        session.sessionId,
+        session.projectId,
+        session.armId,
+        session.interactionCount,
+        errMsg,
+      );
       this.postMessage({ type: "setLoading", loading: false });
       this.postMessage({
         type: "error",
-        text: `Request failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: `Request failed: ${errMsg}`,
       });
     }
   }
@@ -143,6 +167,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {

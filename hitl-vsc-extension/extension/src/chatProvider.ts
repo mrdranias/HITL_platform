@@ -45,6 +45,13 @@ export class HitlChatProvider implements vscode.LanguageModelChatProvider {
       (session.armId === 2 || session.armId === 3) &&
       !session.planningDocumentUri
     ) {
+      const action = await vscode.window.showWarningMessage(
+        "HITL: A planning document is required before sending messages (Arms 2/3).",
+        "Set Planning Document",
+      );
+      if (action === "Set Planning Document") {
+        await vscode.commands.executeCommand("hitl.setPlanningDocument");
+      }
       throw new Error(
         "A planning document must be set before using the AI assistant. " +
           'Run "HITL: Set Planning Document" first.',
