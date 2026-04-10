@@ -38,7 +38,7 @@ async def auth_register(body: AuthRegisterRequest) -> AuthRegisterResponse:
     """Accept a student token and return mock session configuration."""
     session_id = str(uuid.uuid4())
     result = AuthRegisterResponse(
-        arm_id=1,
+        arm_id=3,
         project_id="lab-001",
         session_id=session_id,
         lab_config=LabConfig(landmarks=["start", "planning", "implementation", "review"]),

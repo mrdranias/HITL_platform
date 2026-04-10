@@ -262,6 +262,73 @@ The server **buffers the full upstream LLM response** before applying any drift 
    blocks the LLM request and displays a prompt to set one.
 ```
 
+### 6.5 Demo Intervention (Arm 3)
+
+The current Arm 3 intervention uses a **deterministic, count-based trigger**. The mechanism works as follows:
+
+1. The server returns a list of workflow landmarks at session initialization (e.g. `["start", "planning", "implementation", "review"]`).
+2. The client tracks an `interactionCount` that increments after each successful `/interact` round-trip.
+3. On each request, the client computes the current landmark via `currentLandmark()`:
+   ```
+   idx = min(interactionCount, landmarks.length - 1)
+   landmark = landmarks[idx]
+   ```
+   This means interaction 0 → `"start"`, interaction 1 → `"planning"`, interaction 2 → `"implementation"`, interaction 3+ → `"review"`.
+4. The client sends the computed `workflow_landmark` in the request envelope.
+5. The server's `apply_intervention()` checks:
+   ```
+   if arm_id == 3 AND workflow_landmark == "implementation"
+   ```
+   When true, it appends a pedagogical hint to `response_content`, sets `drift_injected = true`, and records `intervention_id = "impl_hint_v1"`.
+
+**The trigger is fully deterministic:** with the default landmark list, every Arm 3 session will receive the intervention on exactly the **3rd interaction** (index 2). No randomness is involved. The `original_response_hash` field preserves the SHA-256 of the unmodified LLM output for audit comparison.
+
+This is a minimal demo implementation. A production drift engine would support configurable intervention rules, multiple drift types, and landmark-to-rule mappings loaded from the database.
+
+### 6.6 Demo Planning Artifact
+
+A **planning artifact** is a standalone document — separate from the chat conversation — in which the student outlines their goal, approach, and steps before writing code. It is central to the study's hypothesis that explicit planning improves outcomes when working with AI assistants.
+
+**How it works:**
+
+1. The student opens any text or Markdown file in the editor.
+2. The student runs the **"HITL: Set Planning Document"** command (command palette).
+3. The extension records the file's URI in `sessionState.planningDocumentUri`.
+4. On every subsequent `/interact` request, the extension reads the file's current content and attaches it as the `planning_document` field in the `AgentRequestEnvelope`.
+5. For **Arms 2 and 3**, the extension blocks chat if no planning document has been set, ensuring the student engages in explicit planning before using the AI.
+
+Arm 1 students may optionally set a planning document, but it is not enforced.
+
+**Server-side injection (Arms 2 and 3):** When the server receives a request with `arm_id ∈ {2, 3}` and a non-empty `planning_document`, the intervention service (`apply_intervention` in `services.py`) prepends a **system message** to the LLM prompt containing the planning document content. This system message instructs the model to treat the plan as authoritative context and remain consistent with it. The augmented message list is used only for the upstream LLM call — the persistence layer stores the original `envelope.messages` as received from the client, so the logged data reflects exactly what the student sent.
+
+| Arm | Planning doc in LLM prompt | Post-response drift |
+|-----|---------------------------|---------------------|
+| 1   | Not injected              | None                |
+| 2   | Prepended as system message | None              |
+| 3   | Prepended as system message | Hint at `"implementation"` landmark |
+
+**Demo file:** A ready-made planning document is provided at [`extension/demo/plan.md`](extension/demo/plan.md). It contains a short structured plan for a simple Python task ("Print the first 10 even numbers"), with Goal, Approach, Steps, and Expected Output sections.
+
+### 6.7 Demo Flow (End-to-End)
+
+To exercise the full Arm 3 pipeline with the demo artifact:
+
+```
+1. Start the FastAPI server (arm_id defaults to 3).
+2. Launch the extension in the VS Code Extension Development Host.
+3. Accept the IRB disclosure and enter any student token.
+4. Open extension/demo/plan.md in the editor.
+5. Run "HITL: Set Planning Document" from the command palette.
+   → Status bar in the chat panel shows "Plan: set ✓".
+6. Send 1st message   → landmark = "start"         → normal response.
+7. Send 2nd message   → landmark = "planning"       → normal response.
+8. Send 3rd message   → landmark = "implementation" → response includes
+   the appended instructor hint (drift_injected = true).
+9. Send 4th+ messages → landmark = "review"         → normal response.
+```
+
+The trigger is **deterministic**: every Arm 3 session with the default landmark list will inject on exactly the 3rd interaction. The `planning_document` content from `plan.md` is included in every request envelope and persisted in the `interactions` table.
+
 ---
 
 ## 7. Error Handling and Degradation
