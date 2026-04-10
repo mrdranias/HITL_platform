@@ -25,16 +25,19 @@ async def get_arm_assignment(student_token: str) -> int:
     if db_url:
         import asyncpg  # imported lazily so asyncpg is optional without DB
 
-        conn = await asyncpg.connect(db_url)
         try:
-            row = await conn.fetchrow(
-                "SELECT arm_id FROM student_assignments WHERE student_token = $1",
-                student_token,
-            )
-            if row is not None:
-                return int(row["arm_id"])
-        finally:
-            await conn.close()
+            conn = await asyncpg.connect(db_url)
+            try:
+                row = await conn.fetchrow(
+                    "SELECT arm_id FROM student_assignments WHERE student_token = $1",
+                    student_token,
+                )
+                if row is not None:
+                    return int(row["arm_id"])
+            finally:
+                await conn.close()
+        except asyncpg.exceptions.UndefinedTableError:
+            pass  # table not yet created — fall through to JSON
 
     # Fallback: JSON file
     if _ASSIGNMENTS_PATH.exists():
