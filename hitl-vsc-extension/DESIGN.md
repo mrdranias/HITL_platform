@@ -57,9 +57,11 @@ hitl-vsc-extension/
 ├── server/             # FastAPI backend (Python)
 │   ├── app/
 │   ├── schema.sql      # PostgreSQL DDL (auto-executed on first connect)
+│   ├── student_assignments.json  # Token → arm mapping (JSON fallback)
 │   ├── requirements.txt
 │   └── pyproject.toml
-├── docs/               # Additional documentation and lab configs
+├── docs/               # Demo artifacts and documentation
+│   └── demo.md         # Demo planning document
 ├── DESIGN.md           # This document
 └── README.md
 ```
@@ -93,6 +95,26 @@ On first activation, the extension prompts the student for an opaque **student t
 - Lab configuration (including workflow landmark definitions)
 
 The token is persisted in VS Code `SecretStorage` and reused for subsequent sessions. The extension never stores arm assignment logic locally; all assignment is controlled server-side.
+
+#### Token → Arm Mapping
+
+The server resolves each student token to an arm assignment using a two-tier lookup:
+
+1. **PostgreSQL table** `student_assignments` (if `DATABASE_URL` is set) — checked first.
+2. **JSON file** `server/student_assignments.json` — checked as fallback when no DB is configured or the token is not in the table.
+
+If the token is not found in either source the server returns HTTP 403. The JSON file ships with six demo tokens using NATO phonetic names:
+
+| Token | Arm | Description |
+|-------|-----|-------------|
+| `alpha` | 1 | Passthrough |
+| `bravo` | 2 | Planning-context mediation |
+| `charlie` | 3 | Mediation + drift |
+| `delta` | 1 | Passthrough |
+| `echo` | 2 | Planning-context mediation |
+| `foxtrot` | 3 | Mediation + drift |
+
+The client also sends `client_version` at registration, which is recorded in the `sessions` table for auditability.
 
 ### 3.3 Per-Arm Extension Behavior
 
@@ -156,7 +178,7 @@ The server uses a **persistence abstraction** (`PersistenceStore` protocol) so t
 
 The server selects the backend at startup: if `DATABASE_URL` is present, `PostgresStore` is used; otherwise `JsonlStore` writes to `server/data/hitl_log.jsonl`.
 
-**PostgreSQL schema** — three tables (`sessions`, `interactions`, `error_events`), defined in [`server/schema.sql`](server/schema.sql). The DDL uses `CREATE TABLE IF NOT EXISTS` so it is safe to re-run. `PostgresStore` reads and executes this file automatically on first connection; it can also be applied manually:
+**PostgreSQL schema** — four tables (`sessions`, `interactions`, `error_events`, `student_assignments`), defined in [`server/schema.sql`](server/schema.sql). The DDL uses `CREATE TABLE IF NOT EXISTS` so it is safe to re-run. `PostgresStore` reads and executes this file automatically on first connection; it can also be applied manually:
 
 ```bash
 psql $DATABASE_URL -f server/schema.sql
@@ -307,17 +329,18 @@ Arm 1 students may optionally set a planning document, but it is not enforced.
 | 2   | Prepended as system message | None              |
 | 3   | Prepended as system message | Hint at `"implementation"` landmark |
 
-**Demo file:** A ready-made planning document is provided at [`extension/demo/plan.md`](extension/demo/plan.md). It contains a short structured plan for a simple Python task ("Print the first 10 even numbers"), with Goal, Approach, Steps, and Expected Output sections.
+**Demo file:** A ready-made planning document is provided at [`docs/demo.md`](docs/demo.md). It contains a short structured plan for a simple Python task ("Print the first 10 even numbers"), with Goal, Approach, Steps, and Expected Output sections.
 
 ### 6.7 Demo Flow (End-to-End)
 
 To exercise the full Arm 3 pipeline with the demo artifact:
 
 ```
-1. Start the FastAPI server (arm_id defaults to 3).
+1. Start the FastAPI server.
 2. Launch the extension in the VS Code Extension Development Host.
-3. Accept the IRB disclosure and enter any student token.
-4. Open extension/demo/plan.md in the editor.
+3. Accept the IRB disclosure and enter a student token
+   (e.g. "charlie" for Arm 3 — see student_assignments.json).
+4. Open docs/demo.md in the editor.
 5. Run "HITL: Set Planning Document" from the command palette.
    → Status bar in the chat panel shows "Plan: set ✓".
 6. Send 1st message   → landmark = "start"         → normal response.
@@ -327,7 +350,7 @@ To exercise the full Arm 3 pipeline with the demo artifact:
 9. Send 4th+ messages → landmark = "review"         → normal response.
 ```
 
-The trigger is **deterministic**: every Arm 3 session with the default landmark list will inject on exactly the 3rd interaction. The `planning_document` content from `plan.md` is included in every request envelope and persisted in the `interactions` table.
+The trigger is **deterministic**: every Arm 3 session with the default landmark list will inject on exactly the 3rd interaction. The `planning_document` content from `docs/demo.md` is included in every request envelope and persisted in the `interactions` table.
 
 ---
 

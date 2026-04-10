@@ -33,3 +33,9 @@ CREATE TABLE IF NOT EXISTS error_events (
     message        TEXT NOT NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS student_assignments (
+    student_token  TEXT PRIMARY KEY,
+    arm_id         INTEGER NOT NULL CHECK (arm_id IN (1, 2, 3)),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);

@@ -54,7 +54,7 @@ export async function activate(
   }
 
   try {
-    const auth = await apiClient.register(token);
+    const auth = await apiClient.register(token, version);
     await secrets.store(SECRET_KEY, token);
 
     sessionState = {

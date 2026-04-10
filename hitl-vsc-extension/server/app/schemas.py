@@ -31,6 +31,7 @@ class InstructionalResponseEnvelope(BaseModel):
 
 class AuthRegisterRequest(BaseModel):
     student_token: str
+    client_version: str
 
 
 class LabConfig(BaseModel):

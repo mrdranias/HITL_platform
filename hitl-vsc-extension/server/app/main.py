@@ -4,10 +4,11 @@ import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+from .assignments import get_arm_assignment
 from .persistence import JsonlStore, PostgresStore
 from .schemas import (
     AgentRequestEnvelope,
@@ -35,10 +36,15 @@ _interaction_counts: dict[str, int] = {}
 
 @app.post("/auth/register", response_model=AuthRegisterResponse)
 async def auth_register(body: AuthRegisterRequest) -> AuthRegisterResponse:
-    """Accept a student token and return mock session configuration."""
+    """Accept a student token, look up arm assignment, and return session config."""
+    try:
+        arm_id = await get_arm_assignment(body.student_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
     session_id = str(uuid.uuid4())
     result = AuthRegisterResponse(
-        arm_id=3,
+        arm_id=arm_id,
         project_id="lab-001",
         session_id=session_id,
         lab_config=LabConfig(landmarks=["start", "planning", "implementation", "review"]),
@@ -48,7 +54,7 @@ async def auth_register(body: AuthRegisterRequest) -> AuthRegisterResponse:
         student_id=body.student_token,
         project_id=result.project_id,
         arm_id=result.arm_id,
-        client_version="unknown",
+        client_version=body.client_version,
     )
     _interaction_counts[session_id] = 0
     return result

@@ -14,9 +14,10 @@ const INITIAL_DELAY_MS = 1_000;
 export class ApiClient {
   constructor(private readonly baseUrl: string) {}
 
-  async register(studentToken: string): Promise<AuthRegisterResponse> {
+  async register(studentToken: string, clientVersion: string): Promise<AuthRegisterResponse> {
     const raw = await this.postWithRetry("/auth/register", {
       student_token: studentToken,
+      client_version: clientVersion,
     });
     return AuthRegisterResponseSchema.parse(raw);
   }
