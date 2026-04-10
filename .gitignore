@@ -5,6 +5,7 @@ hitl-vsc-extension/extension/out/
 # Server
 hitl-vsc-extension/server/.venv/
 hitl-vsc-extension/server/app/__pycache__/
+hitl-vsc-extension/server/data/
 
 # General
 *.js.map

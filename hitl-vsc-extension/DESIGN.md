@@ -56,6 +56,7 @@ hitl-vsc-extension/
 │   └── tsconfig.json
 ├── server/             # FastAPI backend (Python)
 │   ├── app/
+│   ├── schema.sql      # PostgreSQL DDL (auto-executed on first connect)
 │   ├── requirements.txt
 │   └── pyproject.toml
 ├── docs/               # Additional documentation and lab configs
@@ -139,10 +140,37 @@ Upon receiving an `InstructionalResponseEnvelope` from the server, the extension
 | Networking | Native `fetch` (Node 18+) | No Axios dependency |
 | Schema validation | Zod (client) / Pydantic (server) | Enforce envelope integrity |
 | Credential storage | VS Code `SecretStorage` | Student token persistence |
-| Database | PostgreSQL | Authoritative interaction log, server-side |
+| Database | PostgreSQL (primary) / JSONL (fallback) | Authoritative interaction log, server-side (see [Section 4.1](#41-server-persistence)) |
 | Local logging | VS Code `ExtensionContext.globalStorageUri` | Session recovery only (see [Section 7.2](#72-session-recovery)) |
 
 **Note on `fetch` vs. Axios:** VS Code ships with Node.js 18+, which includes a native `fetch` implementation. Axios is not needed and should not be added as a dependency.
+
+### 4.1 Server Persistence
+
+The server uses a **persistence abstraction** (`PersistenceStore` protocol) so the storage backend can be swapped without changing route handlers or service logic. Two implementations are provided:
+
+| Backend | Class | Activation | Use Case |
+|---------|-------|------------|----------|
+| **PostgreSQL** | `PostgresStore` | Set `DATABASE_URL` in environment | Production / study deployment |
+| **JSONL** | `JsonlStore` | Omit `DATABASE_URL` (automatic fallback) | Local development and testing |
+
+The server selects the backend at startup: if `DATABASE_URL` is present, `PostgresStore` is used; otherwise `JsonlStore` writes to `server/data/hitl_log.jsonl`.
+
+**PostgreSQL schema** — three tables (`sessions`, `interactions`, `error_events`), defined in [`server/schema.sql`](server/schema.sql). The DDL uses `CREATE TABLE IF NOT EXISTS` so it is safe to re-run. `PostgresStore` reads and executes this file automatically on first connection; it can also be applied manually:
+
+```bash
+psql $DATABASE_URL -f server/schema.sql
+```
+
+**Persistence interface** — all implementations expose exactly three methods:
+
+| Method | Called from | Purpose |
+|--------|------------|---------|
+| `create_session(session_id, student_id, project_id, arm_id, client_version)` | `/auth/register` | Record session start |
+| `log_interaction(request, response, interaction_index)` | `/interact` (success path) | Record full request/response pair |
+| `log_error(session_id, message)` | `/interact` (exception path) | Record error events |
+
+**JSONL fallback** — when `DATABASE_URL` is not set, all events are appended as one JSON object per line to a single file. This is sufficient for local development but is not intended for production use.
 
 ---
 
