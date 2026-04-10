@@ -53,6 +53,22 @@ export async function activate(
     }
   }
 
+  // --- Command: hitl.resetToken (registered early so it works even if auth fails) ---
+  context.subscriptions.push(
+    vscode.commands.registerCommand("hitl.resetToken", async () => {
+      await secrets.delete(SECRET_KEY);
+      sessionState = null;
+      vscode.window.showInformationMessage(
+        "HITL: Token cleared. Reload the window to re-authenticate.",
+        "Reload",
+      ).then((action) => {
+        if (action === "Reload") {
+          vscode.commands.executeCommand("workbench.action.reloadWindow");
+        }
+      });
+    }),
+  );
+
   try {
     const auth = await apiClient.register(token, version);
     await secrets.store(SECRET_KEY, token);
@@ -73,27 +89,17 @@ export async function activate(
       sessionState.armId,
     );
   } catch (err) {
+    await secrets.delete(SECRET_KEY);
     vscode.window.showErrorMessage(
-      `HITL: Authentication failed — ${err instanceof Error ? err.message : String(err)}`,
-    );
+      `HITL: Authentication failed — ${err instanceof Error ? err.message : String(err)}. Token has been cleared; reload to try again.`,
+      "Reload",
+    ).then((action) => {
+      if (action === "Reload") {
+        vscode.commands.executeCommand("workbench.action.reloadWindow");
+      }
+    });
     return;
   }
-
-  // --- Command: hitl.resetToken ---
-  context.subscriptions.push(
-    vscode.commands.registerCommand("hitl.resetToken", async () => {
-      await secrets.delete(SECRET_KEY);
-      sessionState = null;
-      vscode.window.showInformationMessage(
-        "HITL: Token cleared. Reload the window to re-authenticate.",
-        "Reload",
-      ).then((action) => {
-        if (action === "Reload") {
-          vscode.commands.executeCommand("workbench.action.reloadWindow");
-        }
-      });
-    }),
-  );
 
   // --- Webview Chat Panel (Section 3.9) ---
   const chatViewProvider = new ChatViewProvider(
