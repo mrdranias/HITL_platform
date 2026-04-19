@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./apiClient";
+import { sanitizeContent } from "./sanitize";
 import { AgentRequestEnvelope } from "./schemas";
 import { SessionLog } from "./sessionLog";
 import { SessionState, currentLandmark } from "./sessionState";
@@ -80,6 +81,30 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (!session.sessionStarted) {
+      this.postMessage({ type: "addMessage", role: "user", content: text });
+      const answer = text.trim().toUpperCase();
+      if (answer === "Y" || answer === "YES") {
+        session.sessionStarted = true;
+        this.postMessage({
+          type: "addMessage",
+          role: "assistant",
+          content: "Session started. You may now ask coding questions.",
+        });
+      } else if (answer === "N" || answer === "NO") {
+        this.postMessage({
+          type: "error",
+          text: "Session declined. Reload the window to try again.",
+        });
+      } else {
+        this.postMessage({
+          type: "error",
+          text: "Please respond with Y or N to acknowledge the research disclaimer.",
+        });
+      }
+      return;
+    }
+
     if (
       (session.armId === 2 || session.armId === 3) &&
       !session.planningDocumentUri
@@ -117,11 +142,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         arm_id: session.armId,
         messages: this.conversationHistory.map((m) => ({
           role: m.role,
-          content: m.content,
+          content: sanitizeContent(m.content),
         })),
         timestamp: new Date().toISOString(),
         workflow_landmark: currentLandmark(session),
-        planning_document: planningDocument,
+        planning_document: planningDocument ? sanitizeContent(planningDocument) : null,
         client_version: this.clientVersion,
       };
 
@@ -174,6 +199,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtml(): string {
+    const session = this.getSession();
+    const emptyStateHtml = session?.sessionStarted
+      ? "HITL AI Lab Assistant<br>Type a message below to continue."
+      : "Do you want to begin a coding session (Y/N)?<br>Please post your project artifact.<br><br><em>Note: All interactions are logged for the AIML research study, and AI outputs may be unreliable.</em>";
     return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -334,8 +363,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
 <div class="messages" id="messages">
   <div class="empty-state" id="emptyState">
-    HITL AI Lab Assistant<br>
-    Type a message below to begin.
+    ${emptyStateHtml}
   </div>
 </div>
 <div class="loading" id="loading">Thinking</div>

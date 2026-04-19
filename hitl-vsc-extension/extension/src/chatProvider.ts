@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { ApiClient } from "./apiClient";
+import { sanitizeContent } from "./sanitize";
 import { AgentRequestEnvelope } from "./schemas";
 import { SessionState, currentLandmark } from "./sessionState";
 
@@ -41,6 +42,12 @@ export class HitlChatProvider implements vscode.LanguageModelChatProvider {
       throw new Error("No active session. Please authenticate first.");
     }
 
+    if (!session.sessionStarted) {
+      throw new Error(
+        "Session not yet started. Please acknowledge the research disclaimer in the HITL Chat panel first.",
+      );
+    }
+
     if (
       (session.armId === 2 || session.armId === 3) &&
       !session.planningDocumentUri
@@ -66,15 +73,20 @@ export class HitlChatProvider implements vscode.LanguageModelChatProvider {
       planningDocument = Buffer.from(bytes).toString("utf-8");
     }
 
+    const sanitizedMessages = extractMessages(messages).map((m) => ({
+      ...m,
+      content: sanitizeContent(m.content),
+    }));
+
     const envelope: AgentRequestEnvelope = {
       student_id: session.studentId,
       session_id: session.sessionId,
       project_id: session.projectId,
       arm_id: session.armId,
-      messages: extractMessages(messages),
+      messages: sanitizedMessages,
       timestamp: new Date().toISOString(),
       workflow_landmark: currentLandmark(session),
-      planning_document: planningDocument,
+      planning_document: planningDocument ? sanitizeContent(planningDocument) : null,
       client_version: this.modelInfo.version,
     };
 

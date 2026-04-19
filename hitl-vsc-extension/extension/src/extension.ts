@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { randomUUID } from "crypto";
 import { ApiClient } from "./apiClient";
 import { HitlChatProvider } from "./chatProvider";
 import { ChatViewProvider } from "./chatViewProvider";
@@ -6,7 +7,6 @@ import { SessionLog } from "./sessionLog";
 import { SessionState } from "./sessionState";
 
 const SECRET_KEY = "hitl.studentToken";
-const SERVER_URL = "http://localhost:8000";
 
 let sessionState: SessionState | null = null;
 
@@ -16,7 +16,10 @@ export async function activate(
   const secrets = context.secrets;
   const version: string =
     (context.extension.packageJSON as { version?: string }).version ?? "0.0.0";
-  const apiClient = new ApiClient(SERVER_URL);
+  const serverUrl = vscode.workspace
+    .getConfiguration("hitlRouting")
+    .get<string>("serverUrl", "http://localhost:8000");
+  const apiClient = new ApiClient(serverUrl);
   const sessionLog = new SessionLog(context.globalStorageUri);
 
   // --- IRB Disclosure (Section 9) ---
@@ -75,12 +78,13 @@ export async function activate(
 
     sessionState = {
       studentId: token,
-      sessionId: auth.session_id,
+      sessionId: randomUUID(),
       projectId: auth.project_id,
       armId: auth.arm_id,
       landmarks: auth.lab_config.landmarks,
       interactionCount: 0,
       planningDocumentUri: null,
+      sessionStarted: false,
     };
 
     await sessionLog.logSessionStart(

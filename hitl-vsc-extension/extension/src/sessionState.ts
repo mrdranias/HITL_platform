@@ -8,6 +8,7 @@ export interface SessionState {
   landmarks: string[];
   interactionCount: number;
   planningDocumentUri: vscode.Uri | null;
+  sessionStarted: boolean;
 }
 
 export function currentLandmark(state: SessionState): string | null {
