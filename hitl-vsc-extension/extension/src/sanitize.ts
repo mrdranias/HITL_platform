@@ -11,7 +11,7 @@ function getUsername(): string {
       _username = process.env.USERNAME ?? process.env.USER ?? "";
     }
   }
-  return _username;
+  return _username ?? "";
 }
 
 function getHostname(): string {
@@ -22,7 +22,7 @@ function getHostname(): string {
       _hostname = "";
     }
   }
-  return _hostname;
+  return _hostname ?? "";
 }
 
 function escapeRegExp(s: string): string {
