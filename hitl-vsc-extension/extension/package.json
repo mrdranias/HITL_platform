@@ -52,6 +52,16 @@
           "name": "Chat"
         }
       ]
+    },
+    "configuration": {
+      "title": "HITL Routing",
+      "properties": {
+        "hitlRouting.serverUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "URL of the HITL routing server."
+        }
+      }
     }
   },
   "scripts": {
