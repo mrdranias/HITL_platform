@@ -1,11 +1,11 @@
 {
   "name": "hitl-routing-extension",
   "displayName": "HITL AI Lab Routing",
-  "description": "Client-side mediation adapter for HITL AI-assisted coding study",
+  "description": "Pedagogical routing adapter for human-in-the-loop AI coding studies.",
   "version": "0.1.0",
-  "publisher": "hitl-lab",
+  "publisher": "aiml-research",
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.115.0"
   },
   "enabledApiProposals": [
     "chatProvider"
@@ -76,8 +76,14 @@
     "@types/vscode": "^1.115.0",
     "typescript": "^5.9.3"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["education", "research", "llm", "pedagogy", "objective-drift"],
+  "author": "Asheville Institute for Machine Learning",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mrdranias/HITL_platform.git"
+  },
+  "categories": ["Education", "Machine Learning", "Other"],
+  "icon": "icon.png",
   "type": "commonjs"
 }

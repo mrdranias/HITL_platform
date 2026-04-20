@@ -1,6 +1,7 @@
 # Extension
 hitl-vsc-extension/extension/node_modules/
 hitl-vsc-extension/extension/out/
+hitl-vsc-extension/extension/*.vsix
 
 # Server
 hitl-vsc-extension/server/.venv/
